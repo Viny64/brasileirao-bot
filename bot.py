@@ -17,7 +17,7 @@ STATE_FILE = Path("sent_matches.json")
 
 # Brasileirão Série A
 LEAGUE_ID = 71
-SEASON = 2026
+SEASON = 2024
 
 FINISHED_STATUSES = {"FT", "AET", "PEN"}
 
