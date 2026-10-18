@@ -68,6 +68,19 @@ def main():
     matches = get_matches()
     new_sent = set(sent)
 
+print(f"Partidas retornadas pela API: {len(matches)}")
+print("Status das partidas:")
+
+for match in matches:
+    print(
+        match.get("utcDate"),
+        match.get("homeTeam", {}).get("name"),
+        "x",
+        match.get("awayTeam", {}).get("name"),
+        "| status:",
+        match.get("status"),
+    )
+
     for match in matches:
         match_id = str(match["id"])
 
