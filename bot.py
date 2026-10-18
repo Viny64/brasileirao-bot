@@ -1,4 +1,4 @@
-
+u
 import os
 import json
 from pathlib import Path
@@ -66,6 +66,7 @@ def send_telegram_message(message):
 def main():
     sent = load_sent_matches()
     matches = get_matches()
+    send_telegram_message("🧪 Teste do bot do Brasileirão: conexão com o Telegram funcionando!")
     new_sent = set(sent)
 
 print(f"Partidas retornadas pela API: {len(matches)}")
