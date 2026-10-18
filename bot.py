@@ -7,19 +7,13 @@ from zoneinfo import ZoneInfo
 
 import requests
 
-API_KEY = os.environ["API_FOOTBALL_KEY"]
+API_KEY = os.environ["FOOTBALL_DATA_TOKEN"]
 BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 
-BASE_URL = "https://v3.football.api-sports.io"
+BASE_URL = "https://api.football-data.org/v4"
 TIMEZONE = ZoneInfo("America/Fortaleza")
 STATE_FILE = Path("sent_matches.json")
-
-# Brasileirão Série A
-LEAGUE_ID = 71
-SEASON = 2024
-
-FINISHED_STATUSES = {"FT", "AET", "PEN"}
 
 
 def load_sent_matches():
@@ -35,30 +29,23 @@ def save_sent_matches(sent):
         json.dump(sorted(sent), file, ensure_ascii=False, indent=2)
 
 
-def get_fixtures():
+def get_matches():
     today = datetime.now(TIMEZONE).date()
     yesterday = today - timedelta(days=1)
 
     response = requests.get(
-        f"{BASE_URL}/fixtures",
-        headers={"x-apisports-key": API_KEY},
+        f"{BASE_URL}/competitions/BSA/matches",
+        headers={"X-Auth-Token": API_KEY},
         params={
-            "league": LEAGUE_ID,
-            "season": SEASON,
-            "from": yesterday.isoformat(),
-            "to": today.isoformat(),
-            "timezone": "America/Fortaleza",
+            "dateFrom": yesterday.isoformat(),
+            "dateTo": today.isoformat(),
         },
         timeout=30,
     )
     response.raise_for_status()
 
     data = response.json()
-
-    if data.get("errors"):
-        raise RuntimeError(f"Erro da API: {data['errors']}")
-
-    return data["response"]
+    return data.get("matches", [])
 
 
 def send_telegram_message(message):
@@ -72,35 +59,30 @@ def send_telegram_message(message):
     )
     response.raise_for_status()
 
-    result = response.json()
-    if not result.get("ok"):
-        raise RuntimeError(f"Erro do Telegram: {result}")
+    if not response.json().get("ok"):
+        raise RuntimeError("O Telegram não confirmou o envio.")
 
 
 def main():
     sent = load_sent_matches()
-    fixtures = get_fixtures()
+    matches = get_matches()
     new_sent = set(sent)
 
-    for fixture in fixtures:
-        match = fixture["fixture"]
-        status = match["status"]["short"]
+    for match in matches:
         match_id = str(match["id"])
 
-        if status not in FINISHED_STATUSES:
+        if match["status"] != "FINISHED":
             continue
 
         if match_id in sent:
             continue
 
-        teams = fixture["teams"]
-        goals = fixture["goals"]
-        league = fixture["league"]
+        home = match["homeTeam"]["name"]
+        away = match["awayTeam"]["name"]
 
-        home = teams["home"]["name"]
-        away = teams["away"]["name"]
-        home_goals = goals["home"]
-        away_goals = goals["away"]
+        score = match.get("score", {}).get("fullTime", {})
+        home_goals = score.get("home")
+        away_goals = score.get("away")
 
         if home_goals is None or away_goals is None:
             continue
@@ -108,18 +90,16 @@ def main():
         message = (
             "🏁 FIM DE JOGO — BRASILEIRÃO\n\n"
             f"⚽ {home} {home_goals} x {away_goals} {away}\n\n"
-            f"🏆 {league['name']}\n"
             "✅ Partida encerrada"
         )
 
-        # Marcar como enviado somente após o Telegram confirmar.
         send_telegram_message(message)
         new_sent.add(match_id)
         save_sent_matches(new_sent)
 
         print(f"Resultado enviado: {home} x {away}")
 
-    print("Verificação concluída.")
+    print(f"Verificação concluída. Jogos consultados: {len(matches)}")
 
 
 if __name__ == "__main__":
